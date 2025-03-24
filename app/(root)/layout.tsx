@@ -1,9 +1,7 @@
-import Link from "next/link";
-import Image from "next/image";
 import { ReactNode } from "react";
 import { redirect } from "next/navigation";
-import LogoutButton from "@/components/LogoutButton";
 import { isAuthenticated } from "@/lib/actions/auth.action";
+import { Analytics } from '@vercel/analytics/next';
 
 const Layout = async ({ children }: { children: ReactNode }) => {
   const isUserAuthenticated = await isAuthenticated();
@@ -12,8 +10,7 @@ const Layout = async ({ children }: { children: ReactNode }) => {
   return (
     <div className="root-layout">
       {/* Navigation Bar */}
-      
-
+      <Analytics />
       {children}
     </div>
   );
