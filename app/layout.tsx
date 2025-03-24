@@ -20,7 +20,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) { 
   return (
-    <html lang="en" className="dark bg-dark-100">
+    <html lang="en" className="dark bg-gray-950">
       <body className={`${monaSans.className} antialiased pattern`}>
         {children}
 

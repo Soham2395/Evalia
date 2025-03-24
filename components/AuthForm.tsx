@@ -3,7 +3,7 @@
 import { z } from "zod";
 import Link from "next/link";
 import Image from "next/image";
-import { toast } from "sonner";
+import Swal from "sweetalert2";
 import { auth } from "@/firebase/client";
 import { useForm } from "react-hook-form";
 import { useRouter } from "next/navigation";
@@ -16,15 +16,14 @@ import {
 
 import { Form } from "@/components/ui/form";
 import { Button } from "@/components/ui/button";
-
 import { signIn, signUp } from "@/lib/actions/auth.action";
 import FormField from "./FormField";
 
 const authFormSchema = (type: FormType) => {
   return z.object({
-    name: type === "sign-up" ? z.string().min(3) : z.string().optional(),
-    email: z.string().email(),
-    password: z.string().min(3),
+    name: type === "sign-up" ? z.string().min(3, "Name must be at least 3 characters") : z.string().optional(),
+    email: z.string().email("Please enter a valid email"),
+    password: z.string().min(6, "Password must be at least 6 characters"),
   });
 };
 
@@ -40,6 +39,22 @@ const AuthForm = ({ type }: { type: FormType }) => {
       password: "",
     },
   });
+
+  const showAlert = (message: string, type: "success" | "error") => {
+    Swal.fire({
+      title: type === "success" ? "Success!" : "Oops...",
+      text: message,
+      icon: type,
+      confirmButtonColor: type === "success" ? "#2ECC71" : "#E74C3C",
+      background: "#1E1E1E",
+      color: "#FFF",
+      customClass: {
+        popup: "rounded-lg shadow-lg",
+        title: "text-lg font-bold",
+        confirmButton: "py-2 px-4 rounded",
+      },
+    });
+  };
 
   const onSubmit = async (data: z.infer<typeof formSchema>) => {
     try {
@@ -60,11 +75,11 @@ const AuthForm = ({ type }: { type: FormType }) => {
         });
 
         if (!result.success) {
-          toast.error(result.message);
+          showAlert(result.message, "error");
           return;
         }
 
-        toast.success("Account created successfully. Please sign in.");
+        showAlert("Account created successfully! Please sign in.", "success");
         router.push("/sign-in");
       } else {
         const { email, password } = data;
@@ -77,21 +92,18 @@ const AuthForm = ({ type }: { type: FormType }) => {
 
         const idToken = await userCredential.user.getIdToken();
         if (!idToken) {
-          toast.error("Sign in Failed. Please try again.");
+          showAlert("Sign-in failed. Please try again.", "error");
           return;
         }
 
-        await signIn({
-          email,
-          idToken,
-        });
+        await signIn({ email, idToken });
 
-        toast.success("Signed in successfully.");
+        showAlert("Signed in successfully!", "success");
         router.push("/");
       }
-    } catch (error) {
-      console.log(error);
-      toast.error(`There was an error: ${error}`);
+    } catch (error: any) {
+      console.error("Auth error:", error);
+      showAlert("Please check your email and password and try again", "error");
     }
   };
 
@@ -102,10 +114,18 @@ const AuthForm = ({ type }: { type: FormType }) => {
       <div className="flex flex-col gap-6 card py-14 px-10">
         <div className="flex flex-row gap-2 justify-center">
           <Image src="/logo.svg" alt="logo" height={32} width={38} />
-          <h2 className="text-primary-100">PrepWise</h2>
+          <h2 className="text-primary-100">Evalia</h2>
         </div>
 
-        <h3>Practice job interviews with AI</h3>
+        <h3 className="text-center text-xl font-semibold">
+          {isSignIn ? "Welcome Back!" : "Create Your Account"}
+        </h3>
+
+        <p className="text-center text-gray-400">
+          {isSignIn
+            ? "Sign in to continue your mock interview journey."
+            : "Get started with AI-powered job interview practice."}
+        </p>
 
         <Form {...form}>
           <form
@@ -116,8 +136,8 @@ const AuthForm = ({ type }: { type: FormType }) => {
               <FormField
                 control={form.control}
                 name="name"
-                label="Name"
-                placeholder="Your Name"
+                label="Full Name"
+                placeholder="Enter your full name"
                 type="text"
               />
             )}
@@ -125,8 +145,8 @@ const AuthForm = ({ type }: { type: FormType }) => {
             <FormField
               control={form.control}
               name="email"
-              label="Email"
-              placeholder="Your email address"
+              label="Email Address"
+              placeholder="Enter your email"
               type="email"
             />
 
@@ -138,17 +158,17 @@ const AuthForm = ({ type }: { type: FormType }) => {
               type="password"
             />
 
-            <Button className="btn" type="submit">
-              {isSignIn ? "Sign In" : "Create an Account"}
+            <Button className="btn w-full py-3 font-semibold" type="submit">
+              {isSignIn ? "Sign In" : "Sign Up"}
             </Button>
           </form>
         </Form>
 
-        <p className="text-center">
-          {isSignIn ? "No account yet?" : "Have an account already?"}
+        <p className="text-center text-gray-400">
+          {isSignIn ? "Don't have an account?" : "Already have an account?"}
           <Link
             href={!isSignIn ? "/sign-in" : "/sign-up"}
-            className="font-bold text-user-primary ml-1"
+            className="font-bold text-primary-100 ml-1 hover:underline"
           >
             {!isSignIn ? "Sign In" : "Sign Up"}
           </Link>
