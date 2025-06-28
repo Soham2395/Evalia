@@ -1,0 +1,20 @@
+{
+  "version": 2,
+  "builds": [
+    {
+      "src": "pdf-server.js",
+      "use": "@vercel/node"
+    }
+  ],
+  "routes": [
+    {
+      "src": "/(.*)",
+      "dest": "/pdf-server.js"
+    }
+  ],
+  "env": {
+    "ADOBE_CLIENT_ID": "@adobe-client-id",
+    "ADOBE_CLIENT_SECRET": "@adobe-client-secret",
+    "ADOBE_ORGANIZATION_ID": "@adobe-organization-id"
+  }
+} 
