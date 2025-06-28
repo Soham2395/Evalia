@@ -5,8 +5,5 @@
       "src": "package.json",
       "use": "@vercel/next"
     }
-  ],
-  "env": {
-    "PDF_SERVER_URL": "@pdf-server-url"
-  }
+  ]
 } 

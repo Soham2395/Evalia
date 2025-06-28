@@ -12,6 +12,7 @@ This project consists of two separate servers that need to be deployed to Vercel
 
 2. **Set Environment Variables in Vercel Dashboard:**
    - Go to your project settings in Vercel
+   - Navigate to the "Environment Variables" section
    - Add all variables from your `.env.local` file
    - **Important:** Add `PDF_SERVER_URL` pointing to your PDF server deployment
 
@@ -58,7 +59,10 @@ PDF_SERVER_URL=https://your-pdf-server.vercel.app
    vercel --prod
    ```
 
-3. **Set Environment Variables for PDF Server:**
+3. **Set Environment Variables for PDF Server in Vercel Dashboard:**
+   - Go to your PDF server project settings in Vercel
+   - Navigate to the "Environment Variables" section
+   - Add these variables directly (not as secrets):
    ```
    ADOBE_CLIENT_ID=your-adobe-client-id
    ADOBE_CLIENT_SECRET=your-adobe-client-secret
@@ -106,7 +110,7 @@ After deploying the PDF server, update the `PDF_SERVER_URL` in your main app's e
 ## Troubleshooting
 
 1. **PDF Server Not Responding:**
-   - Check if Adobe credentials are correct
+   - Check if Adobe credentials are correct in Vercel dashboard
    - Verify the PDF server URL in main app environment variables
    - Check Vercel function logs
 
@@ -116,6 +120,12 @@ After deploying the PDF server, update the `PDF_SERVER_URL` in your main app's e
    - Verify ZIP file handling in PDF server
 
 3. **Environment Variables:**
-   - Make sure all variables are set in Vercel dashboard
+   - Make sure all variables are set in Vercel dashboard (not as secrets)
    - Check for typos in variable names
-   - Ensure PDF_SERVER_URL points to correct deployment 
+   - Ensure PDF_SERVER_URL points to correct deployment
+
+## Important Notes
+
+- **Environment Variables**: Set them directly in the Vercel dashboard, not as secrets
+- **No Secret References**: The `@variable-name` syntax is for Vercel secrets, which we're not using
+- **Separate Deployments**: Each service has its own Vercel project and environment variables 
