@@ -3,6 +3,7 @@ import type { Metadata } from "next";
 import { Mona_Sans } from "next/font/google";
 
 import "./globals.css";
+import "./fonts.css";
 
 const monaSans = Mona_Sans({
   variable: "--font-mona-sans",
