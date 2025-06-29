@@ -32,6 +32,37 @@ function logMessage(message) {
   console.log(`[${timestamp}] ${message}`);
 }
 
+// Root endpoint - simple HTML response
+app.get('/', (req, res) => {
+  res.send(`
+    <!DOCTYPE html>
+    <html>
+    <head>
+      <title>PDF Extraction Server</title>
+      <style>
+        body { font-family: Arial, sans-serif; padding: 20px; }
+        .container { max-width: 600px; margin: 0 auto; }
+        .endpoint { background: #f5f5f5; padding: 10px; margin: 10px 0; border-radius: 5px; }
+      </style>
+    </head>
+    <body>
+      <div class="container">
+        <h1>PDF Extraction Server</h1>
+        <p>This is an API server for PDF text extraction. Available endpoints:</p>
+        <div class="endpoint">
+          <strong>POST /extract-text</strong><br>
+          Body: {"pdfUrl": "https://example.com/document.pdf"}
+        </div>
+        <div class="endpoint">
+          <strong>GET /health</strong><br>
+          Health check endpoint
+        </div>
+      </div>
+    </body>
+    </html>
+  `);
+});
+
 // PDF text extraction endpoint
 app.post('/extract-text', async (req, res) => {
   const { pdfUrl } = req.body;
