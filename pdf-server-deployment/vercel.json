@@ -6,10 +6,10 @@
       "use": "@vercel/node"
     }
   ],
-  "routes": [
+  "rewrites": [
     {
-      "src": "/(.*)",
-      "dest": "/pdf-server.js"
+      "source": "/(.*)",
+      "destination": "/pdf-server.js"
     }
   ],
   "headers": [
