@@ -83,7 +83,18 @@ export async function POST(req: NextRequest) {
     // Validate input
     if (!type || !role || !level || !techstack || !amount || !finalUserId) {
       await logToFile(`Validation error: Missing required fields - type: ${type}, role: ${role}, level: ${level}, techstack: ${techstack}, amount: ${amount}, userid: ${finalUserId}`);
-      return NextResponse.json({ success: false, error: "Missing required fields" }, { status: 500 });
+      return NextResponse.json({ 
+        success: false, 
+        error: "Missing required fields",
+        missingFields: {
+          type: !type,
+          role: !role,
+          level: !level,
+          techstack: !techstack,
+          amount: !amount,
+          userid: !finalUserId
+        }
+      }, { status: 400 });
     }
 
     // Fetch user's resume from Firestore
@@ -136,67 +147,90 @@ export async function POST(req: NextRequest) {
         Thank you!`;
 
     await logToFile(`Prompt sent to Gemini (first 1000 chars): ${prompt.slice(0, 1000)}`);
-    const { text: questionsText } = await generateText({
-      model: google("gemini-2.0-flash-001"),
-      prompt,
-    });
-    await logToFile(`Generated questions: ${questionsText}`);
-
-    let questions: string[];
+    
     try {
-      // Clean up the response to remove markdown code blocks
-      let cleanedText = questionsText.trim();
-      if (cleanedText.startsWith('```json')) {
-        cleanedText = cleanedText.replace(/^```json\s*/, '');
+      const { text: questionsText } = await generateText({
+        model: google("gemini-2.0-flash-001"),
+        prompt,
+      });
+      await logToFile(`Generated questions: ${questionsText}`);
+
+      let questions: string[];
+      try {
+        // Clean up the response to remove markdown code blocks
+        let cleanedText = questionsText.trim();
+        if (cleanedText.startsWith('```json')) {
+          cleanedText = cleanedText.replace(/^```json\s*/, '');
+        }
+        if (cleanedText.startsWith('```')) {
+          cleanedText = cleanedText.replace(/^```\s*/, '');
+        }
+        if (cleanedText.endsWith('```')) {
+          cleanedText = cleanedText.replace(/\s*```$/, '');
+        }
+        
+        await logToFile(`Cleaned text: ${cleanedText}`);
+        
+        questions = JSON.parse(cleanedText);
+        if (!Array.isArray(questions)) {
+          throw new Error("Invalid questions format - not an array");
+        }
+        
+        // Take only the first N questions as requested
+        const requestedAmount = parseInt(amount);
+        if (questions.length < requestedAmount) {
+          throw new Error(`Not enough questions generated. Requested: ${requestedAmount}, Generated: ${questions.length}`);
+        }
+        
+        // Trim to the requested amount
+        questions = questions.slice(0, requestedAmount);
+        await logToFile(`Using first ${requestedAmount} questions out of ${questions.length + requestedAmount - questions.length} generated`);
+      } catch (parseError) {
+        await logToFile(`Failed to parse questions: ${parseError}`);
+        return NextResponse.json({ 
+          success: false, 
+          error: "Invalid question format",
+          rawResponse: questionsText
+        }, { status: 500 });
       }
-      if (cleanedText.startsWith('```')) {
-        cleanedText = cleanedText.replace(/^```\s*/, '');
-      }
-      if (cleanedText.endsWith('```')) {
-        cleanedText = cleanedText.replace(/\s*```$/, '');
-      }
+
+      const interview = {
+        role: role,
+        type: type,
+        level: level,
+        techstack: techstack.split(",").map((tech: string) => tech.trim()),
+        questions,
+        userId: finalUserId,
+        finalized: true,
+        coverImage: getRandomInterviewCover(),
+        createdAt: new Date().toISOString(),
+      };
+
+      await db.collection("interviews").add(interview);
+      await logToFile(`Interview created for user ${finalUserId}: ${JSON.stringify(interview)}`);
+
+      return NextResponse.json({ 
+        success: true, 
+        data: interview,
+        message: "Interview questions generated successfully"
+      }, { status: 200 });
       
-      await logToFile(`Cleaned text: ${cleanedText}`);
-      
-      questions = JSON.parse(cleanedText);
-      if (!Array.isArray(questions)) {
-        throw new Error("Invalid questions format - not an array");
-      }
-      
-      // Take only the first N questions as requested
-      const requestedAmount = parseInt(amount);
-      if (questions.length < requestedAmount) {
-        throw new Error(`Not enough questions generated. Requested: ${requestedAmount}, Generated: ${questions.length}`);
-      }
-      
-      // Trim to the requested amount
-      questions = questions.slice(0, requestedAmount);
-      await logToFile(`Using first ${requestedAmount} questions out of ${questions.length + requestedAmount - questions.length} generated`);
-    } catch (parseError) {
-      await logToFile(`Failed to parse questions: ${parseError}`);
-      return NextResponse.json({ success: false, error: "Invalid question format" }, { status: 500 });
+    } catch (aiError) {
+      await logToFile(`AI generation error: ${aiError}`);
+      return NextResponse.json({ 
+        success: false, 
+        error: `AI generation failed: ${aiError instanceof Error ? aiError.message : 'Unknown error'}` 
+      }, { status: 500 });
     }
-
-    const interview = {
-      role: role,
-      type: type,
-      level: level,
-      techstack: techstack.split(",").map((tech: string) => tech.trim()),
-      questions,
-      userId: finalUserId,
-      finalized: true,
-      coverImage: getRandomInterviewCover(),
-      createdAt: new Date().toISOString(),
-    };
-
-    await db.collection("interviews").add(interview);
-    await logToFile(`Interview created for user ${finalUserId}: ${JSON.stringify(interview)}`);
-
-    return NextResponse.json({ success: true, data: interview }, { status: 200 });
+    
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : String(error);
     await logToFile(`Error in /api/vapi/generate: ${errorMessage}`);
-    return NextResponse.json({ success: false, error: errorMessage }, { status: 500 });
+    return NextResponse.json({ 
+      success: false, 
+      error: errorMessage,
+      timestamp: new Date().toISOString()
+    }, { status: 500 });
   }
 }
 
