@@ -76,7 +76,7 @@ app.post('/extract-text', async (req, res) => {
     logMessage(`PDF downloaded successfully, size: ${pdfBuffer.length} bytes`);
     
     // Create a temporary file for the PDF
-    const tempDir = path.join(__dirname, "temp");
+    const tempDir = process.env.NODE_ENV === 'production' ? '/tmp' : path.join(__dirname, "temp");
     if (!fs.existsSync(tempDir)) {
       fs.mkdirSync(tempDir, { recursive: true });
     }
@@ -241,7 +241,13 @@ app.post('/extract-text', async (req, res) => {
 
 // Health check endpoint
 app.get('/health', (req, res) => {
-  res.json({ status: 'OK', message: 'PDF extraction server is running' });
+  res.json({ 
+    status: 'OK', 
+    message: 'PDF extraction server is running',
+    environment: process.env.NODE_ENV || 'development',
+    tempDir: process.env.NODE_ENV === 'production' ? '/tmp' : path.join(__dirname, "temp"),
+    adobeConfigured: !!(process.env.ADOBE_CLIENT_ID && process.env.ADOBE_CLIENT_SECRET)
+  });
 });
 
 app.listen(PORT, () => {

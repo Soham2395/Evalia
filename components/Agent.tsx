@@ -5,8 +5,7 @@ import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 
 import { cn } from "@/lib/utils";
-import { vapi } from "@/lib/vapi.sdk";
-import { interviewer } from "@/constants";
+import { VoiceClient } from "@/lib/voice-client";
 import { createFeedback } from "@/lib/actions/general.action";
 
 enum CallStatus {
@@ -36,79 +35,16 @@ const Agent = ({
   const [isSpeaking, setIsSpeaking] = useState(false);
   const [lastMessage, setLastMessage] = useState<string>("");
   const [errorMessage, setErrorMessage] = useState<string>("");
+  const [voiceClient, setVoiceClient] = useState<VoiceClient | null>(null);
 
   useEffect(() => {
-    const onCallStart = () => {
-      console.log("Call started successfully");
-      setCallStatus(CallStatus.ACTIVE);
-      setErrorMessage("");
-    };
-
-    const onCallEnd = (event?: any) => {
-      console.log("Call ended", event);
-      setCallStatus(CallStatus.FINISHED);
-      
-      // Check if it was an ejection
-      if (event?.type === "ejection" || event?.message?.includes("ejection")) {
-        console.error("Call was ejected:", event);
-        setErrorMessage("Call was disconnected unexpectedly. Please try again.");
-      }
-    };
-
-    const onMessage = (message: Message) => {
-      console.log("Received message:", message);
-      if (message.type === "transcript" && message.transcriptType === "final") {
-        const newMessage = { role: message.role, content: message.transcript };
-        setMessages((prev) => [...prev, newMessage]);
-      }
-    };
-
-    const onSpeechStart = () => {
-      console.log("Speech started");
-      setIsSpeaking(true);
-    };
-
-    const onSpeechEnd = () => {
-      console.log("Speech ended");
-      setIsSpeaking(false);
-    };
-
-    const onError = (error: Error) => {
-      console.error("Vapi error:", error);
-      setCallStatus(CallStatus.ERROR);
-      setErrorMessage(`Error: ${error.message}`);
-      
-      // Check for specific ejection errors
-      if (error.message.includes("ejection") || error.message.includes("ended")) {
-        setErrorMessage("Call was disconnected. Please try again.");
-      }
-    };
-
-    const onVolumeLevel = (volume: number) => {
-      // Optional: Handle volume levels for debugging
-      console.log("Volume level:", volume);
-    };
-
-    // Set up event listeners
-    vapi.on("call-start", onCallStart);
-    vapi.on("call-end", onCallEnd);
-    vapi.on("message", onMessage);
-    vapi.on("speech-start", onSpeechStart);
-    vapi.on("speech-end", onSpeechEnd);
-    vapi.on("error", onError);
-    vapi.on("volume-level", onVolumeLevel);
-
+    // Cleanup on unmount
     return () => {
-      // Clean up event listeners
-      vapi.off("call-start", onCallStart);
-      vapi.off("call-end", onCallEnd);
-      vapi.off("message", onMessage);
-      vapi.off("speech-start", onSpeechStart);
-      vapi.off("speech-end", onSpeechEnd);
-      vapi.off("error", onError);
-      vapi.off("volume-level", onVolumeLevel);
+      if (voiceClient) {
+        voiceClient.disconnect();
+      }
     };
-  }, []);
+  }, [voiceClient]);
 
   useEffect(() => {
     if (messages.length > 0) {
@@ -135,9 +71,10 @@ const Agent = ({
 
     if (callStatus === CallStatus.FINISHED) {
       if (type === "generate") {
-        router.push("/");
-        // Refresh the page to show the newly created interview
-        window.location.reload();
+        // Do not auto-navigate or refresh so errors/success messages remain visible.
+        // If you want to navigate after success, consider polling Firestore or
+        // having the workflow return a success signal, then navigate conditionally.
+        // e.g., setTimeout(() => router.push("/"), 3000)
       } else {
         handleGenerateFeedback(messages);
       }
@@ -150,38 +87,54 @@ const Agent = ({
       setCallStatus(CallStatus.CONNECTING);
       setErrorMessage("");
 
-      // Validate environment variables
-      if (!process.env.NEXT_PUBLIC_VAPI_WEB_TOKEN) {
-        throw new Error("Vapi web token not configured");
+      // Validate environment variable
+      const voiceServiceUrl = process.env.NEXT_PUBLIC_VOICE_SERVICE_URL;
+      if (!voiceServiceUrl) {
+        throw new Error("Voice service URL not configured. Set NEXT_PUBLIC_VOICE_SERVICE_URL in your environment.");
       }
 
-      if (type === "generate") {
-        if (!process.env.NEXT_PUBLIC_VAPI_WORKFLOW_ID) {
-          throw new Error("Vapi workflow ID not configured");
-        }
-        
-        console.log("Starting workflow call");
-        await vapi.start(process.env.NEXT_PUBLIC_VAPI_WORKFLOW_ID!, {
-          variableValues: {
-            username: userName,
-            userid: userId,
-          },
-        });
-      } else {
-        console.log("Starting interviewer call");
-        let formattedQuestions = "";
-        if (questions) {
-          formattedQuestions = questions
-            .map((question) => `- ${question}`)
-            .join("\n");
-        }
+      // Create voice client
+      const client = new VoiceClient({
+        url: voiceServiceUrl,
+        onTranscript: (transcript, role, isFinal) => {
+          if (isFinal) {
+            setMessages((prev) => [...prev, { role, content: transcript }]);
+          }
+        },
+        onPrompt: (content) => {
+          setIsSpeaking(true);
+          setTimeout(() => setIsSpeaking(false), 2000);
+        },
+        onError: (error) => {
+          console.error("Voice error:", error);
+          setErrorMessage(error);
+          setCallStatus(CallStatus.ERROR);
+        },
+        onDone: () => {
+          console.log("Call completed");
+          setCallStatus(CallStatus.FINISHED);
+        },
+        onConnectionChange: (connected) => {
+          if (connected) {
+            setCallStatus(CallStatus.ACTIVE);
+          }
+        },
+      });
 
-        await vapi.start(interviewer, {
-          variableValues: {
-            questions: formattedQuestions,
-          },
-        });
-      }
+      setVoiceClient(client);
+
+      // Connect to voice service
+      await client.connect(
+        userName,
+        userId!,
+        type === "generate" ? "generate" : "interview",
+        questions
+      );
+
+      // Start recording
+      await client.startRecording();
+
+      console.log("Call started successfully");
     } catch (error) {
       console.error("Error starting call:", error);
       setCallStatus(CallStatus.ERROR);
@@ -191,11 +144,17 @@ const Agent = ({
 
   const handleDisconnect = () => {
     console.log("Manually disconnecting call");
+    if (voiceClient) {
+      voiceClient.disconnect();
+    }
     setCallStatus(CallStatus.FINISHED);
-    vapi.stop();
   };
 
   const handleRetry = () => {
+    if (voiceClient) {
+      voiceClient.disconnect();
+      setVoiceClient(null);
+    }
     setCallStatus(CallStatus.INACTIVE);
     setErrorMessage("");
     setMessages([]);

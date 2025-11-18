@@ -48,3 +48,7 @@ logs/
 
 # temp files
 temp/
+
+# Go voice service binaries
+voice-service/voice-service
+voice-service/*.exe

@@ -95,18 +95,34 @@ export async function getLatestInterviews(
 ): Promise<Interview[] | null> {
   const { userId, limit = 20 } = params;
 
-  const interviews = await db
+  // Fetch latest finalized interviews ordered by createdAt desc.
+  // Avoid Firestore inequality-ordering constraints by NOT using "!= userId" here.
+  // We'll exclude the current user's interviews in memory after fetching.
+  const snapshot = await db
     .collection("interviews")
-    .orderBy("createdAt", "desc")
     .where("finalized", "==", true)
-    .where("userId", "!=", userId)
-    .limit(limit)
+    .orderBy("createdAt", "desc")
+    // Slightly overfetch to compensate for client-side filtering of current user
+    .limit(limit * 2)
     .get();
 
-  return interviews.docs.map((doc) => ({
+  const all = snapshot.docs.map((doc) => ({
     id: doc.id,
     ...doc.data(),
   })) as Interview[];
+
+  // Filter out current user's interviews and cap to requested limit.
+  // If any legacy docs are missing createdAt, push them to the end deterministically.
+  const sanitized = all
+    .filter((i) => i.userId !== userId)
+    .sort((a, b) => {
+      const aTime = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+      const bTime = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+      return bTime - aTime; // desc
+    })
+    .slice(0, limit);
+
+  return sanitized;
 }
 
 export async function getInterviewsByUserId(
