@@ -71,10 +71,8 @@ const Agent = ({
 
     if (callStatus === CallStatus.FINISHED) {
       if (type === "generate") {
-        // Do not auto-navigate or refresh so errors/success messages remain visible.
-        // If you want to navigate after success, consider polling Firestore or
-        // having the workflow return a success signal, then navigate conditionally.
-        // e.g., setTimeout(() => router.push("/"), 3000)
+        // Interview generated via microservice; return user to home
+        setTimeout(() => router.push("/"), 3000);
       } else {
         handleGenerateFeedback(messages);
       }
