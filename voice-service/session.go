@@ -25,7 +25,7 @@ type Session struct {
 	mode         SessionMode
 	dialog       *Dialog
 	sttClient    STTClient
-	ttsClient    *ElevenLabsClient
+	ttsClient    TTSClient
 	audioBuffer  chan []byte
 	done         chan struct{}
 	mu           sync.Mutex
@@ -36,6 +36,11 @@ type Session struct {
 type STTClient interface {
 	SendAudio([]byte) error
 	Close()
+}
+
+// TTSClient abstracts the text-to-speech client.
+type TTSClient interface {
+	Synthesize(string) ([]byte, error)
 }
 
 type ClientMessage struct {
@@ -99,7 +104,18 @@ func (s *Session) Start() {
 		return
 	}
 
-	s.ttsClient = NewElevenLabsClient()
+	// Prefer Amazon Polly if AWS is configured; fall back to ElevenLabs
+	if os.Getenv("AWS_REGION") != "" {
+		if pollyClient, err := NewPollyClient(); err == nil {
+			log.Printf("Using Amazon Polly TTS (voice=%s)", os.Getenv("POLLY_VOICE_ID"))
+			s.ttsClient = pollyClient
+		} else {
+			log.Printf("Polly init failed, falling back to ElevenLabs: %v", err)
+			s.ttsClient = NewElevenLabsClient()
+		}
+	} else {
+		s.ttsClient = NewElevenLabsClient()
+	}
 
 	// Initialize dialog based on mode
 	if s.mode == ModeGenerate {
