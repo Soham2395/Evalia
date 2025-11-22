@@ -2,7 +2,7 @@ import LogoutButton from "@/components/LogoutButton";
 import Link from "next/link";
 import Image from "next/image";
 import { Button } from "@/components/ui/button";
-import InterviewCard from "@/components/InterviewCard";
+import FilteredInterviewsSection from "@/components/FilteredInterviewsSection";
 import { Mic2, Sparkles, BarChart2, Clock, Users, FileText, Upload } from "lucide-react";
 import { getCurrentUser } from "@/lib/actions/auth.action";
 import {
@@ -19,8 +19,7 @@ async function Home() {
     getLatestInterviews({ userId: user?.id! }),
   ]);
 
-  const hasPastInterviews = userInterviews?.length! > 0;
-  const hasUpcomingInterviews = allInterview?.length! > 0;
+  // Sections now handle their own empty states and pagination
 
   return (
     <>
@@ -115,49 +114,17 @@ async function Home() {
         </div>
       </section>
 
-      <section className="flex flex-col gap-6 mt-8">
-        <h2>Your Interviews</h2>
+      <FilteredInterviewsSection
+        title="Your Interviews"
+        interviews={userInterviews}
+        userId={user?.id}
+      />
 
-        <div className="interviews-section">
-          {hasPastInterviews ? (
-            userInterviews?.map((interview) => (
-              <InterviewCard
-                key={interview.id}
-                userId={user?.id}
-                interviewId={interview.id}
-                role={interview.role}
-                type={interview.type}
-                techstack={interview.techstack}
-                createdAt={interview.createdAt}
-              />
-            ))
-          ) : (
-            <p>You haven&apos;t taken any interviews yet</p>
-          )}
-        </div>
-      </section>
-
-      <section className="flex flex-col gap-6 mt-8">
-        <h2>Take Interviews</h2>
-
-        <div className="interviews-section">
-          {hasUpcomingInterviews ? (
-            allInterview?.map((interview) => (
-              <InterviewCard
-                key={interview.id}
-                userId={user?.id}
-                interviewId={interview.id}
-                role={interview.role}
-                type={interview.type}
-                techstack={interview.techstack}
-                createdAt={interview.createdAt}
-              />
-            ))
-          ) : (
-            <p>There are no interviews available</p>
-          )}
-        </div>
-      </section>
+      <FilteredInterviewsSection
+        title="Take Interviews"
+        interviews={allInterview}
+        userId={user?.id}
+      />
       
       <footer className="mt-16 py-6 border-t border-dark-200 text-center text-light-100/50">
         <div className="container mx-auto">
