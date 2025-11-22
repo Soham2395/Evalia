@@ -3,7 +3,7 @@ import Link from "next/link";
 import Image from "next/image";
 import { Button } from "@/components/ui/button";
 import FilteredInterviewsSection from "@/components/FilteredInterviewsSection";
-import { Mic2, Sparkles, BarChart2, Clock, Users, FileText, Upload } from "lucide-react";
+import { Mic2, Sparkles, BarChart2, Clock, Users, FileText, Upload, LayoutDashboard } from "lucide-react";
 import { getCurrentUser } from "@/lib/actions/auth.action";
 import {
   getInterviewsByUserId,
@@ -30,6 +30,12 @@ async function Home() {
         </Link>
         {user && (
           <div className="flex items-center gap-4">
+            <Button asChild className="btn-secondary !min-h-9">
+              <Link href="/dashboard" className="flex items-center gap-2">
+                <LayoutDashboard size={18} />
+                <span className="max-sm:hidden">Dashboard</span>
+              </Link>
+            </Button>
             <div className="hidden md:flex items-center gap-2">
               <div className="w-8 h-8 rounded-full bg-primary-100 flex items-center justify-center">
                 {user.name?.charAt(0) || "U"}
