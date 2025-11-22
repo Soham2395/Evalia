@@ -27,7 +27,7 @@ const Feedback = async ({ params }: RouteParams) => {
     <div className="max-w-4xl mx-auto px-4 py-8">
       {/* Header Section */}
       <div className="mb-8">
-        <Link href="/" className="inline-flex items-center text-primary-200 hover:underline mb-4">
+        <Link href="/dashboard" className="inline-flex items-center text-primary-200 hover:underline mb-4">
           <ArrowLeft className="mr-2" size={18} /> Back to Dashboard
         </Link>
         
@@ -146,7 +146,7 @@ const Feedback = async ({ params }: RouteParams) => {
       {/* Action Buttons */}
       <div className="flex flex-col sm:flex-row gap-4">
         <Button asChild className="btn-secondary flex-1 hover:scale-[1.02] transition-transform">
-          <Link href="/" className="flex items-center justify-center gap-2">
+          <Link href="/dashboard" className="flex items-center justify-center gap-2">
             <ArrowLeft size={18} /> Back to Dashboard
           </Link>
         </Button>

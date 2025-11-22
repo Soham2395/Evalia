@@ -139,3 +139,135 @@ export async function getInterviewsByUserId(
     ...doc.data(),
   })) as Interview[];
 }
+
+export async function getUserDashboardStats(userId: string) {
+  try {
+    // Get all user's interviews
+    const userInterviews = await db
+      .collection("interviews")
+      .where("userId", "==", userId)
+      .get();
+
+    // Get all user's feedback
+    const userFeedback = await db
+      .collection("feedback")
+      .where("userId", "==", userId)
+      .get();
+
+    const interviews = userInterviews.docs.map((doc) => ({
+      id: doc.id,
+      ...doc.data(),
+    })) as Interview[];
+
+    const feedbacks = userFeedback.docs.map((doc) => ({
+      id: doc.id,
+      ...doc.data(),
+    })) as Feedback[];
+
+    // Calculate statistics
+    const interviewsCreated = interviews.length;
+    const interviewsTaken = feedbacks.length;
+    
+    const totalScore = feedbacks.reduce((sum, f) => sum + (f.totalScore || 0), 0);
+    const averageScore = feedbacks.length > 0 ? Math.round(totalScore / feedbacks.length) : 0;
+
+    // Get category averages
+    const categoryAverages: { [key: string]: number } = {};
+    if (feedbacks.length > 0) {
+      feedbacks.forEach((feedback) => {
+        feedback.categoryScores?.forEach((cat) => {
+          if (!categoryAverages[cat.name]) {
+            categoryAverages[cat.name] = 0;
+          }
+          categoryAverages[cat.name] += cat.score;
+        });
+      });
+      
+      Object.keys(categoryAverages).forEach((key) => {
+        categoryAverages[key] = Math.round(categoryAverages[key] / feedbacks.length);
+      });
+    }
+
+    // Performance over time (last 10 interviews)
+    const recentFeedbacks = feedbacks
+      .sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime())
+      .slice(-10);
+
+    return {
+      interviewsCreated,
+      interviewsTaken,
+      averageScore,
+      categoryAverages,
+      recentFeedbacks,
+      allFeedbacks: feedbacks,
+    };
+  } catch (error) {
+    console.error("Error getting user dashboard stats:", error);
+    return null;
+  }
+}
+
+export async function getPeerAverages() {
+  try {
+    // Get all feedback from all users
+    const allFeedback = await db.collection("feedback").get();
+
+    const feedbacks = allFeedback.docs.map((doc) => ({
+      id: doc.id,
+      ...doc.data(),
+    })) as Feedback[];
+
+    if (feedbacks.length === 0) {
+      return {
+        averageScore: 0,
+        categoryAverages: {},
+        totalUsers: 0,
+      };
+    }
+
+    // Calculate peer averages
+    const totalScore = feedbacks.reduce((sum, f) => sum + (f.totalScore || 0), 0);
+    const averageScore = Math.round(totalScore / feedbacks.length);
+
+    // Get category averages
+    const categoryAverages: { [key: string]: number } = {};
+    feedbacks.forEach((feedback) => {
+      feedback.categoryScores?.forEach((cat) => {
+        if (!categoryAverages[cat.name]) {
+          categoryAverages[cat.name] = 0;
+        }
+        categoryAverages[cat.name] += cat.score;
+      });
+    });
+
+    Object.keys(categoryAverages).forEach((key) => {
+      categoryAverages[key] = Math.round(categoryAverages[key] / feedbacks.length);
+    });
+
+    // Get unique users count
+    const uniqueUsers = new Set(feedbacks.map((f) => f.userId));
+
+    return {
+      averageScore,
+      categoryAverages,
+      totalUsers: uniqueUsers.size,
+    };
+  } catch (error) {
+    console.error("Error getting peer averages:", error);
+    return {
+      averageScore: 0,
+      categoryAverages: {},
+      totalUsers: 0,
+    };
+  }
+}
+
+export async function updateUserProfile(userId: string, data: { name?: string }) {
+  try {
+    await db.collection("users").doc(userId).update(data);
+    return { success: true };
+  } catch (error) {
+    console.error("Error updating user profile:", error);
+    return { success: false };
+  }
+}
